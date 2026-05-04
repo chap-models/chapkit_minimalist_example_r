@@ -1,12 +1,13 @@
 [project]
-name = "minimalist_example_r_chapkit"
+name = "chapkit_minimalist_example_r"
 version = "0.1.0"
-description = "ML service for minimalist_example_r_chapkit"
+description = "ML service for chapkit_minimalist_example_r"
 requires-python = ">=3.13"
 dependencies = [
-    "chapkit>=0.10.3",
-    "pandas>=2.3.3",
-    # Add your ML library here (e.g., "scikit-learn>=1.6.1", "tensorflow>=2.17.0")
+    "chapkit>=0.24.0",
+    # Data handling lives in the R scripts (scripts/train.R, scripts/predict.R) -
+    # add Python deps here only if your service-side code (validation hooks,
+    # custom routes, etc.) needs them.
 ]
 
 [dependency-groups]

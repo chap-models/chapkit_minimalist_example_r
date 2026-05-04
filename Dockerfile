@@ -1,111 +1,37 @@
-# INLA Baseline Model Dockerfile
-FROM ghcr.io/astral-sh/uv:0.9-python3.13-bookworm-slim AS builder
+# chapkit_minimalist_example_r Dockerfile
+# chapkit-r-inla ships R 4.5 + INLA + the spatial / time-series stack (sf, spdep, dlnm,
+# tsModel, sn, xgboost, fmesher, ...) preinstalled. The image is amd64-only (INLA ships
+# x86_64 binaries only), so the FROM line pins linux/amd64 via a build ARG - this works
+# on Apple Silicon too via Rosetta. Use chapkit-r instead if you don't need INLA - it's
+# smaller and multi-arch (override BASE_PLATFORM at build time for a native arm64 build,
+# and remove `platform: linux/amd64` from compose.yml).
+ARG BASE_PLATFORM=linux/amd64
+FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r-inla:latest
+# FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r:latest
 
-WORKDIR /app
+# chapkit-py runs as root; matches chapkit-r / chapkit-r-inla.
+USER root
 
-# Install git for fetching dependencies from git repositories
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+WORKDIR /work
+# Copy lockfile + manifest first so the dep-install layer caches independently of code changes.
+# Run `uv sync` once locally before the first `docker build` to generate uv.lock.
+COPY pyproject.toml uv.lock ./
 
-# UV configuration for better build performance
-ENV UV_COMPILE_BYTECODE=1
-ENV UV_LINK_MODE=copy
-
-# Copy project files
-COPY .python-version pyproject.toml uv.lock ./
-
-# Install dependencies (uv will use .python-version to get Python 3.13)
+# Sync user deps into the base image's existing venv at /app/.venv. --frozen pins to
+# uv.lock for reproducible builds, --no-dev skips dev-only deps (uvicorn etc. ship with
+# the base), --no-install-project because this project isn't a package, just a service.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    UV_PROJECT_ENVIRONMENT=/app/.venv uv sync --frozen --no-dev --no-install-project
 
-# Cleanup Python cache files
-RUN find .venv -type d -name '__pycache__' -prune -exec rm -rf {} + && \
-    find .venv -type f -name '*.py[co]' -delete || true
-
-# ---- runtime ----
-#FROM ghcr.io/dhis2-chap/docker_r_inla@sha256:adfc916416f7cd56d6d0368cfdf22d5a24844cafe626259ca9dc48a695142feb AS runtime
-FROM ivargr/r_inla:latest AS runtime
-
-# OCI labels for container metadata
-LABEL org.opencontainers.image.title="INLA Baseline Model"
-LABEL org.opencontainers.image.description="INLA Bayesian hierarchical model with chapkit integration"
-LABEL org.opencontainers.image.vendor="DHIS2 CHAP"
-LABEL org.opencontainers.image.source="https://github.com/dhis2-chap/INLA_baseline_model"
-
-# Install tini and curl for uv installation
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends tini curl ca-certificates && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
-
-# Copy uv from builder stage
-COPY --from=builder /usr/local/bin/uv /usr/local/bin/uv
-
-# Copy project files first
-COPY --from=builder /app/.python-version /app/pyproject.toml /app/uv.lock /app/
-COPY train.R predict.R main.py /app/
-
-WORKDIR /app
-
-# Sync to install Python 3.13 (venv will be created)
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
-
-#ARG USER=chapkit_test_shell UID=10001
-#RUN useradd -u ${UID} -m -s /bin/bash ${USER}
-
-# Set up environment to use the venv
-ENV VIRTUAL_ENV=/app/.venv
-ENV PATH=/app/.venv/bin:${PATH}
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONFAULTHANDLER=1
-
-# Server configuration
-ENV PORT=8000
-ENV TIMEOUT=60
-ENV GRACEFUL_TIMEOUT=30
-ENV KEEPALIVE=5
-ENV FORWARDED_ALLOW_IPS="*"
-
-# Worker configuration
-ENV MAX_REQUESTS=1000
-ENV MAX_REQUESTS_JITTER=200
-
-# Logging configuration
-ENV LOG_FORMAT=json
-ENV LOG_LEVEL=INFO
+COPY main.py ./
+COPY scripts/ ./scripts/
 
 EXPOSE 8000
 
-## Health check to verify the API is responding
-#HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-#    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health').read()" || exit 1
-#
-#ENTRYPOINT ["/usr/bin/tini", "--"]
-#CMD ["uv", "run", "--no-sync", "gunicorn", "-k", "uvicorn.workers.UvicornWorker", "inla_baseline_service:app", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "60", "--graceful-timeout", "30", "--keep-alive", "5", "--max-requests", "1000", "--max-requests-jitter", "200", "--worker-tmp-dir", "/dev/shm", "--access-logfile", "-", "--error-logfile", "-"]
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl --fail http://localhost:8000/health || exit 1
 
-
-
-# Server configuration
-ENV PORT=8000
-ENV TIMEOUT=60
-ENV GRACEFUL_TIMEOUT=30
-ENV KEEPALIVE=5
-ENV FORWARDED_ALLOW_IPS="*"
-
-# Worker configuration
-ENV MAX_REQUESTS=1000
-ENV MAX_REQUESTS_JITTER=200
-
-# Logging configuration
-ENV LOG_FORMAT=json
-ENV LOG_LEVEL=INFO
-
-#USER ${USER}
-EXPOSE 8000
-
-# Health check to verify the API is responding
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/health').read()" || exit 1
-
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["sh", "-c", "GUNICORN_CONF=$(python -c 'import servicekit, os; print(os.path.join(os.path.dirname(servicekit.__file__), \"gunicorn.conf.py\"))'); exec gunicorn -c \"${GUNICORN_CONF}\" -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:${PORT} --workers 1 --timeout ${TIMEOUT} --graceful-timeout ${GRACEFUL_TIMEOUT} --keep-alive ${KEEPALIVE} --forwarded-allow-ips=${FORWARDED_ALLOW_IPS} --max-requests ${MAX_REQUESTS} --max-requests-jitter ${MAX_REQUESTS_JITTER} --worker-tmp-dir /dev/shm"]
+# Run uvicorn directly so server flags (--workers, --log-level, --timeout-keep-alive,
+# etc.) are visible here in the Dockerfile. main.py's `if __name__ == "__main__":`
+# block stays as the local-dev shortcut for `python main.py`.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
