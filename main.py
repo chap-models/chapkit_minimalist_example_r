@@ -58,12 +58,7 @@ class ChapkitMinimalistExampleRConfig(BaseConfig):
 train_command = "Rscript scripts/train.R --data {data_file}"
 
 # Prediction command template (using relative path to script)
-predict_command = (
-    "Rscript scripts/predict.R "
-    "--historic {historic_file} "
-    "--future {future_file} "
-    "--output {output_file}"
-)
+predict_command = "Rscript scripts/predict.R --historic {historic_file} --future {future_file} --output {output_file}"
 
 # Create shell model runner
 runner: ShellModelRunner[ChapkitMinimalistExampleRConfig] = ShellModelRunner(
