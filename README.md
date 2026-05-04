@@ -1,8 +1,15 @@
 # chapkit_minimalist_example_r
 
-ML service for chapkit_minimalist_example_r
+The canonical minimal R example for [chapkit](https://dhis2-chap.github.io/chapkit).
+Fits `lm(disease_cases ~ rainfall + mean_temperature)` and forecasts from future
+climate data, wrapped as a chapkit ML service on top of the public
+[`chapkit-r-inla`](https://github.com/dhis2-chap/chapkit-images) base image.
 
-This project was scaffolded using the [Chapkit](https://dhis2-chap.github.io/chapkit) CLI.
+Use this repo as a starting point for your own R-on-chapkit model: copy and
+replace the `lm()` in `scripts/train.R` / `scripts/predict.R` with your real
+model, update the `MLServiceInfo` block in `main.py`, and you're done.
+
+Scaffolded with `uvx --from chapkit chapkit init <name> --template shell-r`.
 
 ## What you'll edit
 
@@ -162,33 +169,39 @@ fields in its UI when listing models:
 | `red` | Highly experimental prototype, not validated, only for early experimentation |
 | `gray` | Not intended for use - deprecated or kept only for backwards compatibility |
 
-The scaffold ships `AssessedStatus.yellow`; bump it up or down to match reality.
+This repo ships `AssessedStatus.red` because it's a teaching example, not a
+real forecaster. When you fork it for a real model, bump it up to match
+reality.
 
 ### Update Model Configuration
 
-Edit the configuration class in `main.py`:
+Edit the configuration class in `main.py`. The default `Config` only declares
+`prediction_periods`; add whatever your scripts read from `config.yml`:
 
 ```python
 class ChapkitMinimalistExampleRConfig(BaseConfig):
-    # Required: number of prediction periods
     prediction_periods: int = 3
-    # Add your parameters here
+    # Your model's hyperparameters, exposed via the config endpoint
     min_samples: int = 5
     learning_rate: float = 0.01
 ```
 
 ### Customize Training (Shell Runner, R)
 
-Edit `scripts/train.R` to implement your model training logic. The script
-receives `--data <path-to-training-csv>` (and optionally `--geo <path-to-geojson>`),
-reads `config.yml` from the workspace, and writes its model artefact to disk
-(`model.rds` in the example).
+Edit `scripts/train.R` to implement your model training logic. The example
+fits a linear regression — replace the `lm(...)` line with your real model.
+The script receives `--data <path-to-training-csv>` (and optionally
+`--geo <path-to-geojson>`), reads `config.yml` from the workspace if you
+need hyperparameters, and writes the model artefact to `model.rds`.
 
 ### Customize Prediction (Shell Runner, R)
 
-Edit `scripts/predict.R`. It receives `--historic`, `--future`, `--output`
-(and optional `--geo`), loads the model written by training, and writes
-predictions to the `--output` CSV.
+Edit `scripts/predict.R`. The example calls `predict()` on the saved `lm`
+object using `rainfall` and `mean_temperature` from the future CSV — replace
+that with your model's inference path. The script receives `--historic`,
+`--future`, `--output` (and optional `--geo`); it loads the model written
+by training and writes predictions (with at least a `sample_0` column) to
+the `--output` CSV.
 
 ### R packages
 
@@ -222,4 +235,4 @@ chapkit_minimalist_example_r/
 
 ## License
 
-Add your license information here.
+[GPL-3.0](LICENSE), matching sister chap-models repos.
