@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "ML service for chapkit_minimalist_example_r"
 requires-python = ">=3.13"
 dependencies = [
-    "chapkit>=0.27.0",
+    "chapkit>=1.0.0",
     # Data handling lives in the R scripts (scripts/train.R, scripts/predict.R) -
     # add Python deps here only if your service-side code (validation hooks,
     # custom routes, etc.) needs them.
