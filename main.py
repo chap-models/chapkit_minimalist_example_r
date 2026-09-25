@@ -70,7 +70,7 @@ runner: ShellModelRunner[ChapkitMinimalistExampleRConfig] = ShellModelRunner(
 info = MLServiceInfo(
     id="chapkit-minimalist-example-r",
     display_name="chapkit_minimalist_example_r",
-    version="1.0.0",
+    version="1.0.1",
     description=(
         "Minimalist R example: a linear regression on rainfall + mean_temperature, "
         "wrapped as a chapkit service. Intended as a starting point for chapkit-r-inla "
