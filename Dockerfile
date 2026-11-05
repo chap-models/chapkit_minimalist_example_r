@@ -6,7 +6,7 @@
 # smaller and multi-arch (override BASE_PLATFORM at build time for a native arm64 build,
 # and remove `platform: linux/amd64` from compose.yml).
 ARG BASE_PLATFORM=linux/amd64
-FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r-inla:latest
+FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r-inla:latest@sha256:71ccd15298303d05da310b48450453c3d7be4ee1ad3fede986170473745bdb0e
 # FROM --platform=${BASE_PLATFORM} ghcr.io/dhis2-chap/chapkit-r:latest
 
 # chapkit-py runs as root; matches chapkit-r / chapkit-r-inla.
