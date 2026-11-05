@@ -1,6 +1,6 @@
 [project]
 name = "chapkit_minimalist_example_r"
-version = "0.1.0"
+version = "1.0.4"
 description = "ML service for chapkit_minimalist_example_r"
 requires-python = ">=3.13"
 dependencies = [
